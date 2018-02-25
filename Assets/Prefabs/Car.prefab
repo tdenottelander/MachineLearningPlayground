@@ -268,7 +268,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4df66c80e0d5c4f89bf5946b2fed9ca3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  controlledByKeyboard: 1
+  controlledByKeyboard: 0
   speed: 0.435
   steeringMultiplier: 1.763
   directions:
@@ -281,6 +281,8 @@ MonoBehaviour:
   layermask:
     serializedVersion: 2
     m_Bits: 256
+  reward: 0
   rewardText: {fileID: 0}
   inputText: {fileID: 0}
   outputText: {fileID: 0}
+  write: 0

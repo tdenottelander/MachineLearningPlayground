@@ -2,29 +2,32 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class GeneticAlgorithm : MonoBehaviour {
+public class GeneticAlgorithm {
 
     private Chromosome[] chromosomes;
-    public int amountOfChromosomes = 1;
+    public int amountOfChromosomes;
 
-
-	// Use this for initialization
-	void Start () {
+    public GeneticAlgorithm(int amountOfChromosomes) {
+        this.amountOfChromosomes = amountOfChromosomes;
         chromosomes = new Chromosome[amountOfChromosomes];
-        for (int i = 0; i < chromosomes.Length; i++){
-            chromosomes[i] = new Chromosome(3, 0.1f);
-            Debug.Log(chromosomes[i].ToString());
+    }
+
+    public void initializeChromosomes(int genes, float changeRate) {
+        for (int i = 0; i < chromosomes.Length; i++) {
+            chromosomes[i] = new Chromosome(genes, changeRate);
+            //Debug.Log(chromosomes[i].ToString());
         }
-	}
-	
-	// Update is called once per frame
-	void Update () {
-        if(Input.GetKeyDown(KeyCode.U)){
-            foreach(Chromosome c in chromosomes){
-                c.mutate();
-                Debug.Log(c.ToString());
-            }
+    }
+
+    public void updateChromosomes(){
+        foreach(Chromosome c in chromosomes){
+            c.mutate();
+            Debug.Log(c.ToString());
         }
-	}
+    }
+
+    public Chromosome getChromosome(int index){
+        return chromosomes[index];
+    }
 
 }

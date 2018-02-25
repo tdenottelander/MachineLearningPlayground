@@ -17,6 +17,8 @@ public class NeuralNetwork {
         this.inputNeurons = inputNeurons;
         this.hiddenLayerNeurons = hiddenLayerNeurons;
         this.outputNeurons = outputNeurons;
+        this.W0 = Matrix<float>.Build.Dense(hiddenLayerNeurons, inputNeurons, 0);
+        this.W1 = Matrix<float>.Build.Dense(outputNeurons, hiddenLayerNeurons, 0);
         if (initWeights) initializeWeights();
     }
 
@@ -55,5 +57,23 @@ public class NeuralNetwork {
 
     public int getOutputNeurons(){
         return outputNeurons;
+    }
+
+    public void setWeights(Chromosome chromosome) {
+        for (int to = 0; to < hiddenLayerNeurons; to++) {
+            for (int from = 0; from < inputNeurons; from++) {
+                int row = 0;
+                int column = from + (to * inputNeurons);
+                float value = chromosome.data.At(row, column);
+                //Debug.Log("Set row" + to + " column" + from + " to value from chromosome at row" + row + " column" + column + " value" + value);
+                W0.At(to, from, value);
+            }
+        }
+
+        for (int to = 0; to < outputNeurons; to++) {
+            for (int from = 0; from < hiddenLayerNeurons; from++) {
+                W1.At(to, from, chromosome.data.At(0, (hiddenLayerNeurons * inputNeurons) + (from + (to * outputNeurons))));
+            }
+        }
     }
 }

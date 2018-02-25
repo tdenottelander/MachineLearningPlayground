@@ -37,7 +37,7 @@ public class Chromosome {
         this.fitness = fitness;
     }
 
-    public string ToString(){
+    override public string ToString(){
         return "Chromosome:\n" + data.ToString() + "\nFitness: " + fitness + "\nMutationParameter: " + mutationParameter;
     }
 
