@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using MathNet.Numerics.LinearAlgebra;
 
-public class CarController : MonoBehaviour {
+public class CarController : MonoBehaviour, System.IComparable<CarController> {
 
     public bool controlledByKeyboard = false;
     [Range(0,1)]public float speed;
@@ -13,39 +13,39 @@ public class CarController : MonoBehaviour {
     public float maximumRaycast = 10;
     public LayerMask layermask;
     [SerializeField ]private int reward;
-    [SerializeField] private Text rewardText, inputText, outputText;
     private Matrix<float> input;
     private NeuralNetwork nn;
     new private string name;
-    private bool active;
+    private bool alive;
     public bool write = false;
-
-    // Use this for initialization
-    void Start()
-    {
-        
-    }
+    private float lastReward;
+    private SceneController sceneController;
+    private UIController uiController;
 
     public void initialize(){
-        active = true;
+        alive = true;
         reward = 0;
         write = false;
         input = Matrix<float>.Build.Dense(directions.Length, 1, 0);
         nn = new NeuralNetwork(directions.Length, 3, 2, false);
+        lastReward = Time.time;
+        sceneController = SceneController.Instance;
+        uiController = sceneController.getUIController();
     }
 	
 	// Update is called once per frame
 	void Update () {
-        if (active) {
+        if (alive) {
 
 
             toggleKeyboard();
 
             raycast();
-            setInputText();
+            if (write) uiController.setInputText(input.ToString());
 
             Matrix<float> output = nn.runNeuralNetwork(input);
-            setOutputText(output);
+
+            if (write) uiController.setOutputText(output.ToString());
 
             if (controlledByKeyboard) {
                 float steeringInput = steeringMultiplier * Input.GetAxis("Horizontal");
@@ -90,14 +90,6 @@ public class CarController : MonoBehaviour {
         }
     }
 
-    public void setInputText() {
-        if(write && inputText!=null)inputText.text = input.ToString();
-    }
-
-    public void setOutputText(Matrix<float> output){
-        if(write && outputText!=null)outputText.text = output.ToString();
-    }
-
     public void move(float speed){
         transform.Translate(0,0,speed,Space.Self);
     }
@@ -117,19 +109,36 @@ public class CarController : MonoBehaviour {
     private void OnTriggerEnter(Collider other)
     {
         if(other.CompareTag("Wall")){
-            setInactive();
+            setDead();
         } else if(other.CompareTag("Checkpoint")){
             reward += other.GetComponent<Checkpoint>().getReward();
-            if(write && rewardText!=null)rewardText.text = "Reward: " + reward;
+            if(write) uiController.setRewardText("Reward: " + reward);
+            lastReward = Time.time;
+            uiController.updateRankingText();
+            if(sceneController.getActiveCars()[0].Equals(this)){
+                setBestCar(true);
+            }
             //Debug.Log("+" + other.GetComponent<Checkpoint>().getReward() + " reward");
         }
     }
 
-    private void setInactive(){
-        this.active = false;
-        Debug.Log(this.name + " is ded.");
-        this.GetComponent<MeshRenderer>().material.color = Color.red;
+    public void setBestCar(bool active) {
+        if (active) sceneController.setBestCar(this);
+        write = active;
+        GetComponent<MeshRenderer>().material.color = active ? Color.yellow : (alive ? Color.white : Color.red);
+        //Debug.Log("Set car " + this.name + (active ? "active" : "inactive"));
+    }
 
+    private void setDead(){
+        this.alive = false;
+        Debug.Log(this.name + " is ded. Got a score of " + getReward());
+        uiController.updateRankingText();
+        this.GetComponent<MeshRenderer>().material.color = Color.red;
+        List<CarController> listOfActiveCars = sceneController.getActiveCars();
+        listOfActiveCars.Remove(this);
+        if (sceneController.getBestCar().Equals(this)) {
+            listOfActiveCars[0].setBestCar(true);
+        }
     }
 
     public void setName(string name){
@@ -140,42 +149,8 @@ public class CarController : MonoBehaviour {
         return this.nn;
     }
 
-    public void setInputText(Text inputText) {
-        this.inputText = inputText;
-    }
-
-    public void setOutputText(Text outputText) {
-        this.outputText = outputText;
-    }
-
-    public void setRewardText(Text rewardText) {
-        this.rewardText = rewardText;
-    }
-
-    public void setTexts(Text inputText, Text outputText, Text rewardText) {
-        setInputText(inputText);
-        setOutputText(outputText);
-        setRewardText(rewardText);
-    }
-
     public int getReward() {
         return reward;
-    }
-
-    public class CarControllerComparer : IComparer<CarController> {
-        public int Compare(CarController x, CarController y) {
-            if (x == null || y == null) {
-                Debug.Log("either car is null");
-                return 0;
-            }
-            return y.getReward().CompareTo(x.getReward());
-        }
-    }
-
-    public void setBestCar(bool active){
-        write = active;
-        GetComponent<MeshRenderer>().material.color = active ? Color.yellow : Color.white;
-        Debug.Log("Set car " + this.name + (active ? "active" : "inactive"));
     }
 
     public string getName(){
@@ -183,6 +158,28 @@ public class CarController : MonoBehaviour {
     }
 
     public bool isAlive(){
-        return active;
+        return alive;
+    }
+
+    public int Compare(CarController x, CarController y)
+    {
+        if (x == null || y == null)
+        {
+            Debug.Log("either car is null");
+            return 0;
+        }
+        return y.getReward().CompareTo(x.getReward());
+    }
+
+    public int CompareTo(CarController other) {
+        if (other == null || this == null) {
+            Debug.Log("either car is null");
+            return 0;
+        }
+
+        int result = other.getReward().CompareTo(this.getReward());
+        if (result == 0)
+            result = this.lastReward.CompareTo(other.lastReward);
+        return result;
     }
 }

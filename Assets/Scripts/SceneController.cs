@@ -7,14 +7,14 @@ public class SceneController : MonoBehaviour {
 
     public int carsPerGeneration = 1;
     public GameObject carPrefab;
-    public List<CarController> cars;
+    public List<CarController> cars, activeCars;
     public Transform startingPosition;
     public GeneticAlgorithm GA;
     public static SceneController Instance;
     //public GameObject startingObstacle;
     //public float secondsBeforeObstacleDestroy = 8f;
     public CarController bestCar;
-    [SerializeField] private Text inputText, outputText, rewardText;
+    private UIController uiController;
 
     private void Awake()
     {
@@ -27,17 +27,23 @@ public class SceneController : MonoBehaviour {
 
     // Use this for initialization
     void Start () {
+
+        uiController = GetComponent<UIController>();
         cars = new List<CarController>();
         GA = new GeneticAlgorithm(carsPerGeneration);
         GA.initializeChromosomes((5 * 3) + (3 * 2), 0.1f);
+
         for (int i = 0; i < carsPerGeneration; i++){
             CarController currentCar = Instantiate(carPrefab, startingPosition.position, startingPosition.rotation).GetComponent<CarController>();
             currentCar.initialize();
             currentCar.setName("Car " + i);
-            currentCar.setTexts(inputText, outputText, rewardText);
             currentCar.getNN().setWeights(GA.getChromosome(i));
             cars.Add(currentCar);
         }
+        //Make a shallow copy of the cars list.
+        activeCars = new List<CarController>(cars);
+
+        uiController.updateRankingText();
 	}
 	
 	// Update is called once per frame
@@ -45,23 +51,25 @@ public class SceneController : MonoBehaviour {
         if (Input.GetKeyDown(KeyCode.U))
             GA.updateChromosomes();
 
-        highlight();
-	}
-
-    private void highlight() {
-        cars.Sort(new CarController.CarControllerComparer());
-        if (bestCar == null) bestCar = cars[0];
-        int index = 0;
-        while (index < cars.Count) {
-            if (cars[index].isAlive() && cars[index] != bestCar) {
-                bestCar.setBestCar(false);
-                cars[index].setBestCar(true);
-                bestCar = cars[index];
-                break;
-            }
-        }
-
     }
 
+    public void setBestCar(CarController bestCar){
+        if(this.bestCar != null && bestCar != this.bestCar)
+            this.bestCar.setBestCar(false);
+        this.bestCar = bestCar;
+    }
+
+    public List<CarController> getActiveCars(){
+        activeCars.Sort();
+        return this.activeCars;
+    }
+
+    public CarController getBestCar(){
+        return this.bestCar;
+    }
+
+    public UIController getUIController(){
+        return this.uiController;
+    }
 
 }
