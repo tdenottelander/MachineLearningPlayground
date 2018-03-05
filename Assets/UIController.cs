@@ -6,11 +6,13 @@ using UnityEngine.UI;
 
 public class UIController : MonoBehaviour {
 
-    [SerializeField] private Text inputText, outputText, rewardText, rankingText;
+    [SerializeField] private Text inputText, outputText, rewardText, rankingText, endGenerationText, timeOutText;
+    [SerializeField] private GameObject helpPanelMinimized, helpPanelMaximized;
     private SceneController sceneController;
 
     void Start(){
         sceneController = GetComponent<SceneController>();
+        setEndGenerationTextActive(false);
     }
 
     public void setInputText(string text){
@@ -29,6 +31,19 @@ public class UIController : MonoBehaviour {
         rankingText.text = text;
     }
 
+    public void setEndGenerationTextActive(bool active){
+        endGenerationText.gameObject.SetActive(active);
+    }
+
+    public void setTimeOutText(string text){
+        timeOutText.text = text;
+    }
+
+    public void setHelpPanel(bool active){
+        helpPanelMinimized.SetActive(!active);
+        helpPanelMaximized.SetActive(active);
+    }
+
     public void updateRankingText(){
         if(sceneController != null){
             List<CarController> cars = new List<CarController>(sceneController.cars);
@@ -43,5 +58,19 @@ public class UIController : MonoBehaviour {
         } else {
             rankingText.text = "Can't find scenecontroller";
         }
+    }
+
+    void Update(){
+        if(Input.GetKeyDown(KeyCode.H)){
+            setHelpPanel(helpPanelMinimized.activeSelf);
+        }
+    }
+
+    public void setTimeScale(float timeScale){
+        SceneController.Instance.setTimeScale(timeScale);
+    }
+
+    public void setResetTimescaleOnNewGen(bool active){
+        SceneController.Instance.setResetTimescaleOnNewGen(active);
     }
 }

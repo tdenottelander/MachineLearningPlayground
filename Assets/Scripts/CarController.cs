@@ -3,12 +3,13 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using MathNet.Numerics.LinearAlgebra;
+using System;
 
 public class CarController : MonoBehaviour, System.IComparable<CarController> {
 
     public bool controlledByKeyboard = false;
-    [Range(0,1)]public float speed;
-    [Range(0,2)]public float steeringMultiplier;
+    [Range(0,100)]public float speed;
+    [Range(0,200)]public float steeringMultiplier;
     public Transform[] directions;
     public float maximumRaycast = 10;
     public LayerMask layermask;
@@ -18,19 +19,29 @@ public class CarController : MonoBehaviour, System.IComparable<CarController> {
     new private string name;
     private bool alive;
     public bool write = false;
-    private float lastReward;
+    private float timeLastReward;
+    public float timeOut;
     private SceneController sceneController;
     private UIController uiController;
+    private Chromosome chromosome;
+    private List<Checkpoint> checkPoints;
+    private int roundsCompleted;
+    public enum CarMode { AccAndSteer, SteerOnly };
+    public CarMode carMode;
 
-    public void initialize(){
+    public void initialize(float timeOut){
         alive = true;
         reward = 0;
+        roundsCompleted = 0;
+        checkPoints = new List<Checkpoint>();
         write = false;
         input = Matrix<float>.Build.Dense(directions.Length, 1, 0);
         nn = new NeuralNetwork(directions.Length, 3, 2, false);
-        lastReward = Time.time;
+        timeLastReward = Time.time;
+        this.timeOut = timeOut;
         sceneController = SceneController.Instance;
         uiController = sceneController.getUIController();
+
     }
 	
 	// Update is called once per frame
@@ -57,21 +68,35 @@ public class CarController : MonoBehaviour, System.IComparable<CarController> {
                 move(forwardInput);
             } else {
                 steer(steeringMultiplier * output.At(1, 0));
-                float forwardInput = speed * output.At(0, 0);
-                if (forwardInput < 0) forwardInput = 0;
-                move(forwardInput);
-            }
-
-            if (Input.GetKeyDown(KeyCode.Y)) {
-                try {
-                    nn.runNeuralNetwork(input);
-                } catch (InvalidInputException e) {
-                    e.ToString();
-                    Debug.LogError("The input and amount of input neurons do not match.");
+                if (carMode.Equals(CarMode.AccAndSteer)) {
+                    float forwardInput = speed * output.At(0, 0);
+                    if (forwardInput < 0) forwardInput = 0;
+                    move(forwardInput);
+                } else if (carMode.Equals(CarMode.SteerOnly)){
+                    move(speed * 0.1f);
                 }
             }
+
+            //if (Input.GetKeyDown(KeyCode.Y)) {
+            //    try {
+            //        nn.runNeuralNetwork(input);
+            //    } catch (InvalidInputException e) {
+            //        e.ToString();
+            //        Debug.LogError("The input and amount of input neurons do not match.");
+            //    }
+            //}
+
+            if(Time.time - timeLastReward > timeOut){
+                setDead(false);
+            }
+
         }
   	}
+
+    internal void setupNN(Chromosome chromosome) {
+        this.chromosome = chromosome;
+        getNN().setWeights(chromosome);
+    }
 
     public void raycast() {
         for (int i = 0; i < directions.Length; i++){
@@ -91,11 +116,11 @@ public class CarController : MonoBehaviour, System.IComparable<CarController> {
     }
 
     public void move(float speed){
-        transform.Translate(0,0,speed,Space.Self);
+        transform.Translate(0,0,speed * Time.deltaTime,Space.Self);
     }
 
     public void steer(float input){
-        transform.Rotate(new Vector3(0, input, 0));
+        transform.Rotate(new Vector3(0, input * Time.deltaTime, 0));
     }
 
     void toggleKeyboard(){
@@ -109,17 +134,37 @@ public class CarController : MonoBehaviour, System.IComparable<CarController> {
     private void OnTriggerEnter(Collider other)
     {
         if(other.CompareTag("Wall")){
-            setDead();
+            setDead(false);
         } else if(other.CompareTag("Checkpoint")){
-            reward += other.GetComponent<Checkpoint>().getReward();
-            if(write) uiController.setRewardText("Reward: " + reward);
-            lastReward = Time.time;
+            addReward(other.GetComponent<Checkpoint>());
+        }
+    }
+
+    private void addReward(Checkpoint checkPoint){
+        if (!checkPoints.Contains(checkPoint)) {
+
+
+            if(checkPoint.isFinishLine()){
+                //Only add if currentReward = roundsFinished * (maxAmount of Points per Round(440) + finishLine(100)) + maxAmount of Points per Round(440)
+                if (getReward() < (roundsCompleted * 540) + 440){ 
+                    return;
+                } else {
+                    roundsCompleted++;
+                    checkPoints = new List<Checkpoint>();
+                }
+            } else {
+                checkPoints.Add(checkPoint);
+            }
+            this.reward += checkPoint.getReward();
+            if (write) uiController.setRewardText("Reward: " + reward);
+            timeLastReward = Time.time;
             uiController.updateRankingText();
-            if(sceneController.getActiveCars()[0].Equals(this)){
+            //sceneController.setTimeLastUpdate();
+            if (sceneController.getActiveCars()[0].Equals(this)) {
                 setBestCar(true);
             }
-            //Debug.Log("+" + other.GetComponent<Checkpoint>().getReward() + " reward");
         }
+        //Debug.Log("+" + other.GetComponent<Checkpoint>().getReward() + " reward");
     }
 
     public void setBestCar(bool active) {
@@ -129,15 +174,22 @@ public class CarController : MonoBehaviour, System.IComparable<CarController> {
         //Debug.Log("Set car " + this.name + (active ? "active" : "inactive"));
     }
 
-    private void setDead(){
+    public void setDead(bool endOfGeneration){
         this.alive = false;
-        Debug.Log(this.name + " is ded. Got a score of " + getReward());
+        this.chromosome.setFitness(getReward());
+        //Debug.Log(this.name + " is ded. Got a score of " + getReward());
         uiController.updateRankingText();
         this.GetComponent<MeshRenderer>().material.color = Color.red;
-        List<CarController> listOfActiveCars = sceneController.getActiveCars();
-        listOfActiveCars.Remove(this);
-        if (sceneController.getBestCar().Equals(this)) {
-            listOfActiveCars[0].setBestCar(true);
+
+        if (!endOfGeneration) {
+            List<CarController> listOfActiveCars = sceneController.getActiveCars();
+            listOfActiveCars.Remove(this);
+            if (sceneController.getBestCar().Equals(this)) {
+                if (listOfActiveCars.Count != 0)
+                    listOfActiveCars[0].setBestCar(true);
+                else
+                    SceneController.Instance.startCoroutineEndGeneration();
+            }
         }
     }
 
@@ -179,7 +231,7 @@ public class CarController : MonoBehaviour, System.IComparable<CarController> {
 
         int result = other.getReward().CompareTo(this.getReward());
         if (result == 0)
-            result = this.lastReward.CompareTo(other.lastReward);
+            result = this.timeLastReward.CompareTo(other.timeLastReward);
         return result;
     }
 }

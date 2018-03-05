@@ -269,8 +269,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   controlledByKeyboard: 0
-  speed: 0.435
-  steeringMultiplier: 1.763
+  speed: 70.2
+  steeringMultiplier: 129.8
   directions:
   - {fileID: 4627021124185244}
   - {fileID: 4252979792702148}
@@ -282,7 +282,6 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 256
   reward: 0
-  rewardText: {fileID: 0}
-  inputText: {fileID: 0}
-  outputText: {fileID: 0}
   write: 0
+  timeOut: 0
+  carMode: 1
